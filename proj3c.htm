@@ -1,0 +1,427 @@
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=windows-1252">
+<META NAME="Generator" CONTENT="gnu emacs">
+<title>Project 3: RanMaze</title>
+<style type = "text/css">
+<!-- @import "http://www.cs.fsu.edu/~lacher/styles/RCLstyle1.css"; -->
+</style>
+</HEAD>
+<body link="black" vlink="black" alink="#808080">
+
+
+<!--
+<h1><font color=#990000>
+<center>
+Notice!<br>
+This document is still under development. The general expectations will not
+change, but some details are yet to be specified. 
+</font></h1>
+</center>
+-->
+
+<!--
+<center>
+<h1><font color=#990000>
+This document is officially released and open for comment.
+</font></h1>
+</center>
+-->
+
+<center>
+<h1>Project 3: RanMaze</h1>
+</center>
+
+<center><h2><em>
+Random Maze Generation using Partition
+</em></h2></center>
+
+<p>
+<b>Educational Objectives:</b>
+After completing this assignment, the student should be able to accomplish the
+following: 
+</p>
+
+<ul>
+<li>Describe and elucidate the API for the Partition class</li>
+<li>State and give intuitive arguments for the asymptotic runtime of Partition operations</li>
+<li>Describe the supporting data structure for Partition</li>
+<li>Explain how Union is implemented</li>
+<li>Explain how Find is implemented without path compression</li>
+<li>Explain how Find is implemented with path compression</li>
+<li>Define a Maze</li>
+<li>Define and explain the Walls Code used to define cells in a Maze</li>
+<li>Define and explain the concept of self-consistency in a maze file</li>
+<li>Explain how Maze relates to Graph</li>
+<li>Explain how DFS or BFS can be applied to a Maze problem</li>
+<li>Use Partition as a bookkeeping device to generate random mazes</li>
+</ul>
+
+<p>
+<strong>Operational Objectives:</strong>
+Implement the Partition class and a client program that generates random mazes.
+</p>
+
+<p><strong>Deliverables:</strong> Two files:
+</P>
+
+<blockquote><pre>partition.h  # contains template &lt; typename N &gt; class Partition
+ranmaze.cpp  # client program of Partition &lt;&gt; generating random mazes
+</pre>
+</blockquote>
+
+<h2>Procedural Requirements</h2>
+
+<ol type="1">
+
+<li><p>The official
+development, testing, and assessment environment is 
+<tt>g++47 -std=c++11 -Wall -Wextra</tt> on the <tt>linprog</tt> machines. Code should compile without
+error or warning.
+</p></li>
+
+<li><p>
+Begin by copying the following files from the course directory
+into your <tt>proj3</tt> directory:
+</p>
+<blockquote><pre>
+LIB/proj3/fpartition.cpp        # test harness for Partition
+LIB/proj3/makefile              # builds most executables
+LIB/area51/fpartition.x         # sample executable
+LIB/area51/ranmaze.x            # sample executable
+LIB/area51/mazemaster.x         # maze analyzer
+</pre></blockquote>
+<p>
+Execute <tt>ranmaze.x</tt> to generate maze files and <tt>mazemaster.x</tt> to
+analyze the resulting maze files. You will follow the same process in testing
+your own ranmaze and its resulting maze files. Also pay careful attention to the
+detailed I/O behavior of ranmaze, this is how your program should behave. 
+</p>
+</li>
+
+<p><li>Create the file <tt>partition.h</tt> containing the definition and
+implementation of <tt>template&lt;typename N&gt; Partition</tt>. Test your class
+thoroughly using the supplied <tt>fpartition.cpp</tt>.
+</li></p>
+
+<p><li>Create the file <tt>ranmaze.cpp</tt>, a client of
+<tt>Partition&lt;&gt;</tt>. Using <tt>mazemaster.x</tt>, 
+test thoroughly to be sure the mazes it generates
+are self-consistent and that the behavior mimics that of
+<tt>LIB/area51/ranmaze.x</tt>, including the file name extensions for output
+files.
+</li></p>
+
+<p><li>Check that <tt>ranmaze.cpp</tt> and <tt>Partition&lt;&gt;</tt> meet the
+specifications given below.
+</li></p>
+
+<p><li>
+Copy the file <tt>LIB/proj3/proj3submit.sh</tt> into your project
+directory, change its permissions to executable, and 
+submit the project by executing the script.
+</p>
+
+<p>
+<em><b>Warning:</b> Submit scripts do not work on the <tt>program</tt> and
+<tt>linprog</tt> servers. Use <tt>shell.cs.fsu.edu</tt> to submit projects. If you do
+not receive the second confirmation with the contents of your project, there has
+been a malfunction.</em>
+</p>
+</li>
+
+</ol>
+
+<h2>Code Requirements and Specifications - Partition</h2>
+
+<ol type="1">
+
+<li><p>
+Use the API defined by the following:
+</p><blockquote><pre>
+namespace fsu
+{
+  template &lt; typename N = size_t &gt;
+  class Partition
+  {
+  public:
+    explicit Partition     ( N size );       // create singletons {0} .. {size-1}
+    void     Reset         ();               // reverts to singletons
+    void     Reset         ( N newsize ); 
+    void     PushSingleton ()                   { parent_.PushBack((N)parent_.Size()); rank_.PushBack(0); }
+    void     Union         ( N x , N y )        { Link(Root(x),Root(y)); }
+    bool     Find          ( N x , N y )        { return Root(x) == Root(y); }
+    bool     Find          ( N x , N y ) const  { return Root(x) == Root(y); }
+
+    size_t   Size          () const             { return rank_.Size(); }
+    size_t   Components    () const;
+    void     Display       ( std::ostream& os ) const;
+    void     Dump          ( std::ostream& os ) const;
+
+  private: // methods
+    N    Root   ( N x );                // path compression changes state
+    N    Root   ( N x ) const;          // no path compression
+    void Link   ( N root1 , N root2 );  // union assuming arguments are roots
+
+  private: // objects
+    fsu::Vector &lt;N&gt; parent_;
+    fsu::Vector &lt;N&gt; rank_;
+  };
+  ...
+} // fsu
+</pre></blockquote><p>
+
+Follow the implementation started here. This is distinct from that of the
+lecture notes in that
+</p><ol>
+<li><tt>N</tt> is assumed to be an unsigned type</li>
+<li>Root nodes are recognized by <tt>(parent_[i] == (N)i)</tt></li>
+<li>Rank/height info is maintained in the separate
+  vector <tt>rank_</tt>. Recall this starts out as the height of the tree
+  rooted at <tt>i</tt> but is not maintained once <tt>i</tt> ceases to be a
+  root in the forest.</li>
+</ol><p>
+Only a few key implementations are lacking.
+</p></li>
+
+<li><p>
+Be sure that you implement path compression in the non-const version of <tt>Root</tt>.
+Of course, you will be forced to use the non-compression version for the
+<tt>const</tt> version of <tt>Root</tt>.
+</p></li>
+
+<li><p>
+Use the distributed example executable <tt>area51/fpartition.x</tt> to see what
+behavior is expected from <tt>Display()</tt> and <tt>Components()</tt>.
+Because <tt>Dump()</tt> should display the internal data of the structure, which
+is of course different from that in the distributed example, you should consult
+the discussion forum to agree with other students on this behavior.
+</p></li>
+
+</ol>
+
+<h2>Code Requirements and Specifications - ranmaze</h2>
+
+<ol type="1">
+
+<li><p>
+Output maze files according to the spec in the Union-Find notes Appendix: Maze
+Technology. Take care that all maze files are syntactically and semantically
+correct - <tt>mazemaster.x</tt> is helpful in testing your output. 
+</p></li>
+
+<li><p>The maze file should have the start as cell at the beginning (left-most
+    cell) of the
+    middle row and the goal at the end (right-most cell) of the same row.
+</p></li>
+
+<li><p>
+<tt>ranmaze</tt> should expect three command line arguments: <tt>number of rows</tt>,
+<tt>number of columns</tt>, and <tt>filename</tt>.
+</p></li>
+
+<li><p>
+<tt>ranmaze</tt> should output two versions of the random maze:
+(1) the first time <tt>goal</tt> is reachable from <tt>start</tt>,
+output the maze to the file "filename.[components]" where
+[components] is the actual number of components in the maze; and (2) after all
+cells are reachable from <tt>start</tt>, output the maze to the file "filename.1".
+</p></li>
+
+<!--
+<li><p>
+</p></li>
+-->
+
+<li><p>
+Take care that your mazes are correctly "random" in the sense that all
+walls have the same probability of being selected for inspection at each
+step. This is mostly a matter of judicious design, especially at boundary
+cases. For example: be sure that a cell face on an interior cell has the same
+chance of selection as a cell face of a boundary cell, where fewer faces are
+eligible. 
+</p></li>
+
+</ol>
+
+<h2>Hints - Partition</h2>
+
+<ul>
+<li><p>
+The Partition constructor needs to call the correct Vector constructors in order
+to get the representation initialized to singletons:
+</p><blockquote><pre>
+Partition<N>::Partition ( N size ) :  parent_((size_t)size, 0) , rank_((size_t)size, 0)
+{
+  // loop setting parent values
+}
+</pre></blockquote>
+</li>
+
+<li><p>
+Be sure to explicitly cast when mixing the two types <tt>N</tt> and <tt>size_t</tt>.
+</p></li>
+
+<li><p>
+Use the distributed executable  <tt>area51/fpartition.x</tt> to see the expected
+behavior of <tt>Components</tt> and <tt>Display</tt>.
+</p></li>
+
+<li><p>
+The <tt>Display</tt> method is somewhat involved. The solution compiled as part
+of <tt>area51/fpartition.x</tt> uses two data structures:
+</p><blockquote><pre>
+fsu::Vector &lt; N > rootorder(Size(),(N)Size());
+fsu::Vector &lt; fsu::List &lt; N > > setlist (components);
+</pre></blockquote><p>
+and about 20 lines of code. If you are unable to get this working correctly,
+just output "<tt>Display not implemented\n</tt>" so your code will run, and
+we'll take off 5 points.
+</p></li>
+
+</ul>
+
+<h2>Hints - ranmaze</h2>
+
+<ul>
+<li><p>
+A very handy way to generate unsigned integers is with the fsu random object
+generator. Include these files:
+</p><blockquote><pre>
+#include &lt;xran.h&gt;
+#include &lt;xran.cpp&gt;
+</pre></blockquote><p>
+
+and declare an object and use it like this:
+
+</p><blockquote><pre>
+fsu::Random_unsigned_int ran;
+...
+x = ran(a,b); // x is a random unsigned int in the range a <= x < b
+y = ran(0,4); // y is a random choice of 0,1,2,3 (N,E,S,W)
+z = ran(0,2); // z is a random choice of 0 or 1 (coin flip)
+</pre></blockquote><p>
+
+This generator uses the Marsaglia KISS generator as its underlying engine.
+</p></li>
+
+<li><p>
+An effective way to organize ranmaze.cpp is to write a function
+</p><pre>
+void <font color="red">Connect</font>(
+              size_t beg , size_t end ,            // start and goal cells
+              size_t numrows, size_t numcols,      // maze dimensions
+              fsu::Vector&lt;unsigned char>& maze ,   // walls codes for cells
+              fsu::Partition&lt;size_t>& p            // tracks component structure
+            );
+</pre><p>
+
+that can be called from <tt>main()</tt> once for the "first pass" maze and subsequently as often as
+needed for the "one component" maze. Note that the maze data and partition data
+are passed by reference so that modifications made in a call to Connect will affect
+the data in the calling process. The organization is then left to function main:
+
+</p><pre>
+int main (int argc, char* argv[])
+{
+  ...
+  size_t numcells = numrows * numcols;
+  size_t numcells = numrows*numcols;
+  start = ??;
+  goal = ??;
+  fsu::Vector&lt;unsigned char> maze (numcells, 15);   // all closed boxes
+  fsu::Partition&lt;size_t> p (numcells);              // all singletons
+
+  // ensure goal is reachable from start:
+  std::cout &lt;&lt; " components after 0 passes:   " &lt;&lt; p.Components() &lt;&lt; '\n';
+  <font color="red">Connect</font> (start, goal, numrows, numcols, maze, p);
+  size_t components = p.Components();
+  std::cout &lt;&lt; " components after 1 pass:     " &lt;&lt; components &lt;&lt; '\n';
+  if (components > 1)  // output intermediate result the first time goal is reachable
+  {
+    // build filename filec
+    ...
+    // output first pass maze
+    out1.open(filec);
+    WriteMaze(out1, start, goal, numrows, numcols, maze);
+    out1.close();
+    out1.clear();
+    std::cout &lt;&lt; "1-pass maze written to file " &lt;&lt; filec &lt;&lt; '\n';
+  }
+
+  // continue until all cells are reachable
+  if (components > 1)
+  {
+    for (size_t cell = 1; cell &lt; numcells; ++cell)
+    {
+      <font color="red">Connect</font> (0, cell, numrows, numcols, maze, p);
+    }
+  }
+  std::cout &lt;&lt; " components after all passes: " &lt;&lt; p.Components() &lt;&lt; '\n';
+  out1.open(file1);
+  WriteMaze(out1, start, goal, numrows, numcols, maze);
+  out1.close();
+  out1.clear();
+  std::cout &lt;&lt; "n-pass maze written to file " &lt;&lt; file1 &lt;&lt; '\n';
+  ...
+}
+</pre><p>
+</p></li>
+
+<li><p>
+
+Building the filename is just the metedious [meticulous + tedious] work of creating the correct
+  size null-terminated character array and putting all the characters in the
+  right place. You need two such file names "filec" and "file1" each of which is
+  the user input filename "file" with an extension appended. To get the
+  extension for filec, unfortunately there is no "itoa" in the library, so you
+  need the number of <tt> digits = 1 + (size_t)log10(components)</tt> and a loop
+  that finds the digits:
+</p><pre>
+  for (size_t i = 0; i &lt; digits; ++i)
+  {
+    char digit = '0' + (char)(components % 10);
+    // put this digit in the correct place in filec
+    components /= 10;
+  }
+</pre>
+This loop calculates the digits. You have to put them in the correct place in
+    the file name array. Don't forget the null terminator. (You can also
+    use <tt>std::stringstream</tt> if you prefer.)
+</p></li>
+
+<li><p>
+Here is a way to get srated on the main program, including the handy constants for four
+atomic walls:
+
+</p><pre>
+  const unsigned char NORTH = 0x01;
+  const unsigned char EAST  = 0x02;
+  const unsigned char SOUTH = 0x04;
+  const unsigned char WEST  = 0x08;
+  ...
+  int main (int argc, char* argv[])
+  {
+    if (argc &lt; 4)
+    {
+      std::cout &lt;&lt; "** command line arguments required:\n"
+                &lt;&lt; "   1: number of rows\n"
+                &lt;&lt; "   2: number of cols\n"
+                &lt;&lt; "   3: file name for maze\n"
+      return 0;
+    }
+    size_t numrows = atoi(argv[1]);
+    size_t numcols = atoi(argv[2]);
+    ...
+  }
+</pre><p>
+The wall constants are global, hence accessible from <tt><font color="red">Connect</font>()</tt>
+</p></li>
+
+<li><p>
+Note that the supplied
+<tt>makefile</tt> has targets <tt>fpartition.x</tt>, <tt>ranmaze.x</tt>, and
+<tt>mazemaster.x</tt>.
+</p></li>
+
+</ul>
